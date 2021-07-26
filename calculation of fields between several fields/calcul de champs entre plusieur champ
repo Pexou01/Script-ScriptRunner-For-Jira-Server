@@ -1,0 +1,13 @@
+import com.atlassian.jira.component.ComponentAccessor
+import com.atlassian.jira.issue.Issue
+
+
+// Call to JIRA field
+final field1 = getCustomFieldValue("Story_points")
+final field2 = getCustomFieldValue("Valeur_Metier")
+final field3 = getCustomFieldValue("Réduction risque & Opportunité")
+final field4 = getCustomFieldValue("Criticité du temps")
+
+
+//return the sum of the fields with calculation method
+return  (field2 + field3 + field4) / field1 
