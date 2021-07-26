@@ -1,0 +1,86 @@
+import com.atlassian.jira.bc.issue.search.SearchService
+import com.atlassian.jira.component.ComponentAccessor
+import com.atlassian.jira.jql.parser.JqlQueryParser
+import com.atlassian.jira.web.bean.PagerFilter
+
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+
+final PROJECT_KEY = "FU"
+final CUSTOM_FIELD_NAME = "test"
+
+def issueService = ComponentAccessor.issueService
+def projectManager = ComponentAccessor.projectManager
+def versionManager = ComponentAccessor.versionManager
+
+def project = projectManager.getProjectByCurrentKey(PROJECT_KEY)
+def loggedInUser = ComponentAccessor.jiraAuthenticationContext.loggedInUser
+
+def searchService = ComponentAccessor.getComponent(SearchService)
+def jqlQueryParser = ComponentAccessor.getComponent(JqlQueryParser)
+def query = jqlQueryParser.parseQuery("project = $PROJECT_KEY and '$CUSTOM_FIELD_NAME' is not EMPTY")
+def searchResults = searchService.search(loggedInUser, query, PagerFilter.unlimitedFilter)
+
+def customFieldManager = ComponentAccessor.customFieldManager
+def externalSystemVersionField = customFieldManager.getCustomFieldObjectsByName(CUSTOM_FIELD_NAME).first()
+
+final datePattern = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")
+
+searchResults.results.each { issue ->
+    log.debug "Looking at issue ${issue.key}"
+    def importedVersion = issue.getCustomFieldValue(externalSystemVersionField).toString()
+
+    def roughVersions = importedVersion.tokenize(',')
+    def realVersions = roughVersions.collect { roughVersion ->
+        def parts = roughVersion.tokenize('.')
+        def dateString = parts[4]
+        def versionName = parts[5..7].join('.')
+        log.debug "Trying to create version $versionName with date string $dateString"
+
+        def releaseDate = LocalDateTime.parse(dateString, datePattern).atZone(ZoneId.systemDefault())
+        def priorVersions = project.versions.toList().findAll {
+            this.compareVersions(it.name, versionName) < 0
+        }.sort {
+            this.compareVersions(it.name, versionName)
+        }
+
+        Long afterVersionId = priorVersions.empty ? -1L : priorVersions.last().id
+        project.versions.find { it.name == versionName } ?: versionManager.createVersion(
+            versionName,
+            null,
+            Date.from(releaseDate.toInstant()),
+            "",
+            project.id,
+            afterVersionId,
+            true
+        )
+    }
+
+    Long[] fixVersionIds = realVersions*.id
+    def inputParameters = issueService.newIssueInputParameters().setFixVersionIds(fixVersionIds)
+
+    def validationResult = issueService.validateUpdate(loggedInUser, issue.id, inputParameters)
+    if (validationResult.isValid()) {
+        def updateResult = issueService.update(loggedInUser, validationResult)
+        if (updateResult.valid) {
+            log.debug "Successfully updated issue ${issue.key}"
+        } else {
+            log.error "Failed to update $issue.key"
+            log.error updateResult.errorCollection*.errorMessages
+        }
+    }
+}
+
+
+Integer compareVersions(String version1, String version2) {
+    def parts1 = version1.tokenize('.')*.toInteger()
+    def parts2 = version2.tokenize('.')*.toInteger()
+    if (parts1[0] == parts2[0]) {
+        if (parts1[1] == parts2[1]) {
+            return parts1[2] - parts2[2]
+        }
+        return parts1[1] - parts2[1]
+    }
+    parts1[0] - parts2[0]
+}
