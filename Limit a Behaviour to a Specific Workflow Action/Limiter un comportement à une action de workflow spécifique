@@ -1,0 +1,14 @@
+import groovy.transform.BaseScript
+import com.onresolve.jira.groovy.user.FieldBehaviours
+
+@BaseScript FieldBehaviours fieldBehaviours
+
+final expectedActionName = 'Start Progress'
+final expectedDestinationName = 'Done'
+final fieldName = 'Some Field'
+
+def field = getFieldByName(fieldName)
+
+actionName == expectedActionName || destinationStepName == expectedDestinationName ?
+    field.setRequired(true) :
+    field.setRequired(false)
