@@ -1,0 +1,107 @@
+import com.atlassian.jira.component.ComponentAccessor
+import com.atlassian.jira.issue.AttachmentError
+import com.atlassian.jira.issue.IssueInputParametersImpl
+import com.atlassian.jira.issue.Issue
+import com.atlassian.jira.user.ApplicationUser
+import com.onresolve.scriptrunner.runner.rest.common.CustomEndpointDelegate
+import groovy.json.JsonSlurper
+import groovy.transform.BaseScript
+import org.apache.log4j.Level
+
+import javax.ws.rs.core.MediaType
+import javax.ws.rs.core.MultivaluedMap
+import javax.ws.rs.core.Response
+
+import com.atlassian.jira.issue.attachment.CreateAttachmentParamsBean
+
+@BaseScript CustomEndpointDelegate delegate
+
+// Set log level to INFO (default for REST endpoints is WARN)
+log.setLevel(Level.INFO)
+
+def projectManager = ComponentAccessor.projectManager
+def userManager = ComponentAccessor.userManager
+def issueService = ComponentAccessor.issueService
+def constantsManager = ComponentAccessor.constantsManager
+
+// The requesting user must be in one of these groups
+final allowedGroups = ['jira-administrators']
+receiveFormWithAttachments(httpMethod: "POST", groups: allowedGroups) { MultivaluedMap queryParams, String body ->
+    def form = new JsonSlurper().parseText(body) as Map<String, List>
+
+    // Gets the project from the key submitted in the form
+    def project = projectManager.getProjectObjByKey(form.project?.getAt(0) as String)
+    // Choose a user who has permissions to create issues
+    final username = 'admin'
+    def user = userManager.getUserByKey(username)
+
+    // The issue type to create
+    final issueTypeName = 'Task'
+    def params = new IssueInputParametersImpl()
+    params.with {
+        setProjectId(project?.id)
+        setReporterId(user?.name)
+        // Sets summary and description from the form data
+        setSummary(form.summary?.getAt(0) as String)
+        setDescription(form.description?.getAt(0) as String)
+        setIssueTypeId(constantsManager.allIssueTypeObjects.findByName(issueTypeName).id)
+    }
+
+    def createValidationResult = issueService.validateCreate(user, params)
+    if (createValidationResult.errorCollection.hasAnyErrors()) {
+        log.error("Couldn't create issue: ${createValidationResult.errorCollection}")
+        return Response.serverError().type(MediaType.APPLICATION_JSON).entity([errors: createValidationResult.errorCollection.errors]).build()
+    }
+
+    def issue = issueService.create(user, createValidationResult).issue
+    log.info "Created issue: ${issue.key}"
+
+    // Adds attachments if present
+    def warnings = form.attachments ? createAttachments(issue, user, form.attachments) : []
+    // Generate an HTML list of potential warnings (if any)
+    def warningsHtmlList = warnings ? "<ul> ${ warnings.collect { "<li>${it}</li>" }.join('') } </ul>" : ''
+
+    log.info("[TEST] The warning HTML list ${warningsHtmlList}")
+    Response.ok("Issue created. ${warningsHtmlList}".toString()).type(MediaType.TEXT_HTML).build()
+}
+
+List<String> createAttachments(Issue issue, ApplicationUser user, List<Map> attachments) {
+    def attachmentManager = ComponentAccessor.attachmentManager
+
+    // Check if attachments are enabled in the instance
+    if (!attachmentManager.attachmentsEnabled()) {
+        def warning = "Warning! Attachments are disabled on the Jira instance and couldn't be created"
+        log.warn(warning)
+        return [warning]
+    }
+
+    def tempDir = new File(System.getProperty('java.io.tmpdir'))
+    def warnings = attachments.findResults { Map<String, String> attachment ->
+        // Create the attachment file in the temp dir
+        def attachmentFile
+        try {
+            attachmentFile = new File(tempDir, attachment.filename as String)
+            attachmentFile.createNewFile()
+            attachmentFile.bytes = (attachment.content as String).decodeBase64()
+        } catch (IOException e) {
+            def warning = "Warning! Couldn't create attachment with name '${attachment.filename}'"
+            log.warn("${warning}: ${e.message}")
+            return warning
+        }
+
+        // Create the attachment in Jira
+        def attachmentBean = new CreateAttachmentParamsBean.Builder(attachmentFile, attachment.filename as String, attachment.contentType as String, user, issue).build()
+        def result = attachmentManager.tryCreateAttachment(attachmentBean)
+
+        if (result.isLeft()) {
+            def attachmentError = result.left().get() as AttachmentError
+            def warning = "Warning! Couldn't create attachment with name '${attachmentBean.filename}'"
+            log.warn("${warning}: : '${attachmentError.logMessage}'")
+            return warning
+        }
+
+        log.info("Attachment with name '${attachmentBean.filename}' created!")
+    }
+
+    warnings
+}
