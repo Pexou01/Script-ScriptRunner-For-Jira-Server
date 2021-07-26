@@ -1,0 +1,36 @@
+import org.apache.log4j.Level
+import org.apache.log4j.Logger
+import com.atlassian.jira.component.ComponentAccessor
+import com.atlassian.jira.workflow.JiraWorkflow
+import com.opensymphony.workflow.loader.ActionDescriptor
+import com.opensymphony.workflow.loader.StepDescriptor
+import com.atlassian.jira.issue.CustomFieldManager
+import com.atlassian.jira.issue.Issue
+import com.atlassian.jira.issue.fields.CustomField
+//LOG
+def log = Logger.getLogger("com.onresolve.jira.groovy")
+log.setLevel(Level.DEBUG)
+// Constructor
+def issue = Issue
+def issueManager = ComponentAccessor.getIssueManager()
+// Call to Jira field
+def Date = getFieldByName("Date de sortie de stock")
+def cat = getFieldByName("Catégorie de Mantis")
+// Default declaration
+def defaultValue = null
+
+// Loop over the value of the Mantis Category field to make the field Mandatory during the transition. || = or
+if ( "Correctif MCO"  in cat.value || "Assistance"  in cat.value || "Correctif VSR"  in cat.value ) {
+	log.debug('inside IF')
+	Date.setRequired(true)
+	Date.setHidden(false)
+	cat.setHidden(true)  
+	Date.setHelpText ("Champ obligatoire pour Correctif MCO/Assistance/Correctif VSR")
+// Otherwise if another value, non-mandatory field plus hide field
+} else  {
+	log.debug('inside else')
+	Date.setRequired(false) 
+	Date.setHidden(true)
+	cat.setHidden(true)
+    Date.setFormValue(defaultValue) 
+}
