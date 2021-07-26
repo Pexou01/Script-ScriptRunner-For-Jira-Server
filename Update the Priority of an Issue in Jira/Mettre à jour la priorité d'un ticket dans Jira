@@ -1,0 +1,31 @@
+import com.atlassian.jira.component.ComponentAccessor
+import com.atlassian.jira.event.type.EventDispatchOption
+
+// the key of the issue we will update
+final String issueKey = "JRA-1"
+
+// the name of the priority to set
+final String priorityName = "High"
+
+// set to true in order to send an email
+final boolean sendMail = false
+
+def issueService = ComponentAccessor.issueService
+def loggedInUser = ComponentAccessor.jiraAuthenticationContext.loggedInUser
+def issue = ComponentAccessor.issueManager.getIssueByCurrentKey(issueKey)
+
+def availablePriorities = ComponentAccessor.constantsManager.priorities
+def highPriority = availablePriorities.find { it.name == priorityName }
+
+assert highPriority : "Could not find priority with name $priorityName. Available priorities are ${availablePriorities*.name.join(", ")}"
+
+def issueInputParams = issueService.newIssueInputParameters()
+issueInputParams.with {
+    priorityId = highPriority.id
+}
+
+def updateValidationResult = issueService.validateUpdate(loggedInUser, issue?.id, issueInputParams)
+assert updateValidationResult.valid : updateValidationResult.errorCollection
+
+def updateResult = issueService.update(loggedInUser, updateValidationResult, EventDispatchOption.ISSUE_UPDATED, sendMail)
+assert updateResult.valid : updateResult.errorCollection
