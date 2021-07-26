@@ -1,0 +1,99 @@
+import com.atlassian.jira.component.ComponentAccessor
+import com.atlassian.crowd.embedded.api.User
+import com.atlassian.jira.ComponentManager
+import com.atlassian.jira.issue.IssueFactory
+import com.atlassian.jira.project.ProjectManager
+import com.atlassian.jira.project.Project
+import com.atlassian.jira.user.util.UserUtil
+import com.atlassian.jira.issue.customfields.CustomFieldType
+import com.atlassian.jira.issue.customfields.*
+import com.atlassian.jira.issue.CustomFieldManager
+import com.atlassian.jira.issue.IssueManager
+import com.atlassian.jira.issue.index.IndexException
+import com.atlassian.jira.ManagerFactory
+import com.atlassian.jira.user.util.UserUtil
+import com.atlassian.jira.bc.issue.search.SearchService
+import com.atlassian.jira.issue.MutableIssue
+import com.atlassian.jira.issue.Issue;
+import com.atlassian.jira.web.bean.PagerFilter
+import com.atlassian.jira.issue.util.DefaultIssueChangeHolder
+import com.atlassian.jira.issue.CustomFieldManager
+import com.atlassian.jira.issue.ModifiedValue
+import com.atlassian.fugue.Option
+import org.apache.log4j.Category
+import com.atlassian.jira.issue.issuetype.IssueType
+import com.atlassian.jira.issue.link.IssueLinkType
+import com.atlassian.jira.issue.IssueManager
+import com.atlassian.jira.issue.link.IssueLinkTypeManager
+import com.atlassian.crowd.embedded.api.User
+import com.atlassian.jira.component.ComponentAccessor
+import com.atlassian.jira.ComponentManager
+import com.atlassian.jira.issue.Issue
+import com.atlassian.jira.issue.MutableIssue
+import com.atlassian.plugin.PluginAccessor
+import com.atlassian.fugue.Option
+import com.atlassian.jira.issue.ModifiedValue
+import com.atlassian.jira.issue.util.DefaultIssueChangeHolder
+import com.atlassian.jira.issue.util.IssueChangeHolder
+import com.opensymphony.workflow.WorkflowContext
+import com.atlassian.jira.workflow.WorkflowTransitionUtil;
+import com.atlassian.jira.workflow.WorkflowTransitionUtilImpl;
+import com.atlassian.jira.util.JiraUtils;
+ 
+def issueMgr = ComponentManager.getInstance().getIssueManager()
+ComponentManager componentManager=ComponentManager.getInstance()
+def issueFactory = ComponentManager.getInstance().getIssueFactory()
+def projectMgr = ComponentManager.getInstance().getProjectManager()
+CustomFieldManager customFieldManager = componentManager.getCustomFieldManager()
+User currentUserObj = ComponentAccessor.getJiraAuthenticationContext().getLoggedInUser();
+ 
+def cf = customFieldManager.getCustomFieldObjectByName('Date Start to Calculate SLA');
+ 
+//uncomment to test the options
+ 
+//def fecha = '2016-06-30';
+ 
+//Date now = new Date().parse('yyyy-MM-dd', fecha);
+Date now = new Date();
+ 
+long time = 0;
+boolean res = false;
+ 
+//to calculate .... working_days = calculate_working_days ( , );
+ 
+if (issue.getCustomFieldValue(cf) != null && issue.getCustomFieldValue(cf) != "") {
+if ( issue.resolutionDate ) {
+time= (((((issue.resolutionDate.getTime() - issue.getCustomFieldValue(cf).getTime())/1000)/60)/60)/24);
+ 
+if ( time > 5 ) // 5 days of SLA
+return "<font color='red'><b>"+time+" days</b></font></a>";
+else
+return "<font color='green'><b>"+time+" days</b></font></a>";
+} else {
+time= (((((now.getTime() - issue.getCustomFieldValue(cf).getTime())/1000)/60)/60)/24);
+if ( time > 5 )
+return "<font color='red'><b>"+time+" days</b></font></a>";
+else
+return "<font color='green'><b>"+time+" days</b></font></a>";
+}
+} else {
+return "<font color='blue'><b>Time is not counted in this Status</b></font></a>";
+}
+int calculate_working_days (date_start, date_end ) {
+def date_limit = date_end.format('yyyy-MM-dd');
+def date_aux = date_start.format('yyyy-MM-dd');
+def date = date_start;
+def i = 0;
+def days = 0;
+def weekday = null;
+while ( date_aux != date_limit ) {
+weekday = Date.parse('yyyy-MM-dd', date_aux)[Calendar.DAY_OF_WEEK];
+if (!( weekday == Calendar.SUNDAY || weekday == Calendar.SATURDAY )) {
+days++;
+}
+date = date + 1;
+date_aux = date.format('yyyy-MM-dd');
+i++;
+}
+return days;
+}
