@@ -1,0 +1,40 @@
+package com.acme.scriptrunner.scripts
+import com.atlassian.jira.component.ComponentAccessor
+import com.atlassian.jira.issue.CustomFieldManager
+import com.atlassian.jira.issue.ModifiedValue
+import com.atlassian.jira.issue.util.DefaultIssueChangeHolder
+import com.atlassian.jira.issue.fields.CustomField
+import com.atlassian.jira.issue.Issue
+import com.atlassian.jira.issue.IssueInputParameters
+import com.atlassian.jira.issue.customfields.manager.OptionsManager
+import com.atlassian.jira.issue.IssueManager
+
+
+
+// Call Jira fields
+final customFieldNameMultiple = "Engagement_PI" //multiple select
+final customFieldNameSingle = "Increment_de_developpement" // single select
+
+// Construtor
+IssueManager issueManager = ComponentAccessor.issueManager
+OptionsManager optionsManager = ComponentAccessor.optionsManager
+
+// Invoking Jira objects
+def customFieldMultiple = customFieldManager.getCustomFieldObjects(issue).findByName(customFieldNameMultiple) 
+def customFieldSingle = customFieldManager.getCustomFieldObjects(issue).findByName(customFieldNameSingle)
+def customFieldValueMultiple = issue.getCustomFieldValue(customFieldMultiple)
+def customFieldValueSingle = issue.getCustomFieldValue(customFieldSingle)
+def newOption = optionsManager.getOptions(customFieldMultiple.getRelevantConfig(issue)).find {it.value == customFieldValueSingle.toString().trim()}
+
+// Association of values
+customFieldValueSingle += customFieldValueMultiple
+
+// Declaration of the reception variable
+def g = customFieldValueSingle
+
+// Copy the value into the PI Engagement field
+DefaultIssueChangeHolder changeHolder = new DefaultIssueChangeHolder()
+customFieldMultiple.updateValue(null, issue, new ModifiedValue(customFieldMultiple, g), changeHolder)
+
+//Adding the comment to the ticket
+issueInputParameters.setComment("L'incrément de développement est copier dans Engagement PI")
