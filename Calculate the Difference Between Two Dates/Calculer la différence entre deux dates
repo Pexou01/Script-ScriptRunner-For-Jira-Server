@@ -1,0 +1,32 @@
+import com.atlassian.jira.component.ComponentAccessor
+
+import java.sql.Timestamp
+import java.time.temporal.ChronoUnit
+
+// Get the required component
+def customFieldManager = ComponentAccessor.customFieldManager
+
+// The name of the lower date custom field
+final String lowerDateCustomFieldName = "Lower Date Custom Field"
+// The name of the higher date custom field
+final String higherDateCustomFieldName = "Higher Date Custom Field"
+
+// Get the custom field objects
+def lowerDateCustomField = customFieldManager.getCustomFieldObjects(issue).find { it.name == lowerDateCustomFieldName }
+def higherDateCustomField = customFieldManager.getCustomFieldObjects(issue).find { it.name == higherDateCustomFieldName }
+if (!lowerDateCustomField || !higherDateCustomField) {
+    log.info "Could not find one ore more of the provided custom fields"
+    return null
+}
+
+// Get the date values from both issues
+def lowerDateValue = issue.getCustomFieldValue(lowerDateCustomField) as Timestamp
+def higherDateValue = issue.getCustomFieldValue(higherDateCustomField) as Timestamp
+// Transform both values to instants
+def lowerDateInstant = lowerDateValue?.toInstant()
+def higherDateInstant = higherDateValue?.toInstant()
+
+// Change the chrono unit to obtain the difference in other time unit.
+final chronoUnit = ChronoUnit.DAYS
+// Calculate the difference between the lower and the higher date.
+lowerDateInstant && higherDateInstant ? chronoUnit.between(lowerDateInstant, higherDateInstant) : null
