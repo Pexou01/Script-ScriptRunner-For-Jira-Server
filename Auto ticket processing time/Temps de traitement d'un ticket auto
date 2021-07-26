@@ -1,0 +1,32 @@
+import com.atlassian.jira.component.ComponentAccessor
+import com.atlassian.jira.issue.history.ChangeItemBean
+
+
+final statusName = 'Prise en compte'
+final statusName1 = 'En cours'
+
+def changeHistoryManager = ComponentAccessor.changeHistoryManager
+def totalStatusTime = [0L]
+
+
+def changeItems = changeHistoryManager.getChangeItemsForField(issue, "status")
+changeItems.reverse().each { ChangeItemBean item ->
+    def timeDiff = System.currentTimeMillis() - item.created.time
+    
+    if (item.fromString == statusName && item.fromString != item.toString) {
+        totalStatusTime << -timeDiff
+    }
+    if (item.fromString == statusName1 && item.fromString != item.toString) {
+        totalStatusTime << -timeDiff
+    }
+   
+    if (item.toString == statusName) {
+        totalStatusTime << timeDiff
+    }
+    if (item.toString == statusName1) {
+        totalStatusTime << timeDiff
+    }
+}
+def total = totalStatusTime.sum() as Long
+
+(total / 1000) as long ?: 0L
