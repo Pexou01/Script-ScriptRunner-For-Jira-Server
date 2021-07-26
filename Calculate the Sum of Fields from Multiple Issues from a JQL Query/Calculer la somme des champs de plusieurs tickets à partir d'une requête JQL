@@ -1,0 +1,21 @@
+import com.atlassian.jira.component.ComponentAccessor
+import com.atlassian.jira.issue.Issue
+
+// sum up the values of this custom field
+final customFieldName = 'Amount Paid'
+
+def subtasks = issue.subTaskObjects
+
+// if the issue doesn't have any sub-tasks or is a subtask itself then no need for action
+if (!subtasks) {
+    return
+}
+
+def firstSubtask = subtasks.first()
+def customField_ = ComponentAccessor.customFieldManager.getCustomFieldObjects(firstSubtask).findByName(customFieldName)
+if (!customField_) {
+    log.info "Custom field with name $customFieldName is not configured for issue type $firstSubtask.issueType.name and project $firstSubtask.projectObject.key"
+    return null
+}
+
+subtasks.sum { Issue it -> it.getCustomFieldValue(customField_) ?: 0 }
