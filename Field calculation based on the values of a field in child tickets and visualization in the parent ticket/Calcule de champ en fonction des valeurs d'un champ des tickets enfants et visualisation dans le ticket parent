@@ -1,0 +1,23 @@
+import com.atlassian.jira.ComponentAccessor
+import com.atlassian.jira.issue.CustomFieldManager
+import com.atlassian.jira.component.ComponentAccessor;
+// Construtor
+def issueLinkManager = ComponentAccessor.getIssueLinkManager()
+def cfManager = ComponentAccessor.getCustomFieldManager()
+// Initialization of the story point calculation
+double totalSP = 0
+// Call of the field to calculate ID of the field
+customField = ComponentAccessor.getCustomFieldManager().getCustomFieldObject("customfield_10106");
+
+// Loop on ticket type
+if (issue.getIssueTypeId() == "10206") {
+    return null
+}
+// Calling the link type ID plus loop for adding story points
+issueLinkManager.getOutwardLinks(issue.id)?.each {issueLink ->;
+    if ( issueLink.issueLinkType.name !="10304"  ) {
+          double SP = (double)(issueLink.destinationObject.getCustomFieldValue(customField) ?: 0)
+        totalSP = SP + totalSP   
+}}
+// Returns the total value of the story points in the script
+return  totalSP
