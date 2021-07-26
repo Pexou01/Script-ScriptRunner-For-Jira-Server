@@ -1,0 +1,25 @@
+import com.atlassian.jira.component.ComponentAccessor
+import com.atlassian.jira.issue.history.ChangeItemBean
+import static com.onresolve.scriptrunner.canned.util.OutputFormatter.markupBuilder
+
+def statusMap = [:]
+ComponentAccessor.changeHistoryManager.getChangeItemsForField(issue, "status").each { ChangeItemBean item ->
+    if (statusMap[item.fromString]) {
+        if (item.fromString != item.toString) {
+            statusMap[item.fromString]++
+        }
+    } else {
+        statusMap[item.fromString] = 1
+    }
+}
+
+if (!statusMap) {
+    return null
+}
+markupBuilder {
+    ul {
+        statusMap.collect { status, times -> "$status : $times" }.each { status ->
+            li(status)
+        }
+    }
+}
