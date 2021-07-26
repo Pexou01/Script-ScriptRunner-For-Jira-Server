@@ -1,0 +1,14 @@
+import com.atlassian.jira.component.ComponentAccessor
+import com.atlassian.jira.issue.security.IssueSecurityLevelManager
+
+def reporterDomain = issue.reporter.emailAddress.split('@').last()
+
+// if the reporter domain is adaptavist.com then the issue should be private
+if (reporterDomain == 'adaptavist.com') {
+    def securityLevelManager = ComponentAccessor.getComponent(IssueSecurityLevelManager)
+    def securityLevelId = issue.securityLevelId
+
+    return securityLevelId ? securityLevelManager.getIssueSecurityName(securityLevelId) == 'Private' : false
+}
+
+true
