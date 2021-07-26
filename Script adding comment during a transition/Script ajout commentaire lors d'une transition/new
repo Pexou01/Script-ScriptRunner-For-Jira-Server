@@ -1,0 +1,14 @@
+import com.atlassian.jira.component.ComponentAccessor
+import com.atlassian.jira.issue.comments.CommentManager;
+import com.atlassian.jira.issue.Issue;
+import com.atlassian.jira.issue.CustomFieldManager;
+
+def CurrentUser = ComponentAccessor.getJiraAuthenticationContext().getUser().name
+Issue issue  = issue
+def CommentManager commentManager = ComponentAccessor.getCommentManager()
+def customFieldManager = ComponentAccessor.getCustomFieldManager()
+def textField = customFieldManager.getCustomFieldObjectByName("Demo Text Field");
+if(textField){
+       String CommentText = textField.getValue(issue).toString()
+       commentManager.create(issue,CurrentUser,CommentText,true)
+}
